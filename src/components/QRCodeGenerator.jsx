@@ -4,7 +4,61 @@ import React, { useState, useEffect } from 'react';
 import { Wifi, Link as LinkIcon, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 const QRCodeGenerator = () => {
-  // ... existing state code ...
+  const [mounted, setMounted] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [state, setState] = useState({
+    inputType: 'wifi',
+    ssid: '',
+    password: '',
+    url: '',
+    resolution: 'medium',
+    showText: false,
+    showPassword: true
+  });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const handleInputChange = (name, value) => {
+    setState(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const generateQRCode = () => {
+    let data = '';
+    if (state.inputType === 'wifi') {
+      data = `WIFI:S:${state.ssid};T:WPA;P:${state.password};;`;
+    } else {
+      data = state.url;
+    }
+
+    const size = state.resolution === 'low' ? 100 : state.resolution === 'medium' ? 200 : 300;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+    setQrCodeUrl(qrUrl);
+    setShowQRCode(true);
+  };
+
+  const handleReturn = () => {
+    setShowQRCode(false);
+    setQrCodeUrl('');
+  };
+
+  const downloadQRCode = () => {
+    const link = document.createElement('a');
+    link.href = qrCodeUrl;
+    link.download = 'qrcode.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-white p-4 md:p-8">
