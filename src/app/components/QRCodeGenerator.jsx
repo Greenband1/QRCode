@@ -1,12 +1,17 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Wifi, Link as LinkIcon, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Wifi, Link as LinkIcon, Eye, EyeOff, ArrowLeft, AlertCircle } from 'lucide-react';
+import QRCode from 'react-qr-code';
 
 const QRCodeGenerator = () => {
   const [mounted, setMounted] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [errors, setErrors] = useState({
+    ssid: '',
+    password: '',
+    url: ''
+  });
   const [state, setState] = useState({
     inputType: 'wifi',
     ssid: '',
@@ -21,39 +26,110 @@ const QRCodeGenerator = () => {
     setMounted(true);
   }, []);
 
+  const validateInputs = () => {
+    let isValid = true;
+    const newErrors = {
+      ssid: '',
+      password: '',
+      url: ''
+    };
+
+    if (state.inputType === 'wifi') {
+      if (!state.ssid.trim()) {
+        newErrors.ssid = 'SSID is required';
+        isValid = false;
+      }
+      if (!state.password.trim()) {
+        newErrors.password = 'Password is required';
+        isValid = false;
+      } else if (state.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters';
+        isValid = false;
+      }
+    } else {
+      if (!state.url.trim()) {
+        newErrors.url = 'URL is required';
+        isValid = false;
+      } else {
+        try {
+          new URL(state.url);
+        } catch (e) {
+          newErrors.url = 'Please enter a valid URL';
+          isValid = false;
+        }
+      }
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
   const handleInputChange = (name, value) => {
     setState(prev => ({
       ...prev,
       [name]: value
     }));
+    // Clear error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }));
+    }
+  };
+
+  const getQRSize = () => {
+    switch (state.resolution) {
+      case 'low': return 128;
+      case 'medium': return 256;
+      case 'high': return 512;
+      default: return 256;
+    }
+  };
+
+  const getQRData = () => {
+    if (state.inputType === 'wifi') {
+      return `WIFI:S:${state.ssid};T:WPA;P:${state.password};;`;
+    }
+    return state.url;
   };
 
   const generateQRCode = () => {
-    let data = '';
-    if (state.inputType === 'wifi') {
-      data = `WIFI:S:${state.ssid};T:WPA;P:${state.password};;`;
-    } else {
-      data = state.url;
+    if (validateInputs()) {
+      setShowQRCode(true);
     }
-
-    const size = state.resolution === 'low' ? 100 : state.resolution === 'medium' ? 200 : 300;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
-    setQrCodeUrl(qrUrl);
-    setShowQRCode(true);
   };
 
   const handleReturn = () => {
     setShowQRCode(false);
-    setQrCodeUrl('');
   };
 
   const downloadQRCode = () => {
-    const link = document.createElement('a');
-    link.href = qrCodeUrl;
-    link.download = 'qrcode.png';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const svg = document.querySelector('svg');
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+
+    img.onload = () => {
+      canvas.width = getQRSize();
+      canvas.height = getQRSize();
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+
+      const pngUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = 'qrcode.png';
+      link.href = pngUrl;
+      link.click();
+    };
+
+    img.src = url;
   };
 
   if (!mounted) {
@@ -76,9 +152,10 @@ const QRCodeGenerator = () => {
             <h2 className="text-2xl font-bold text-gray-900">Your QR Code</h2>
             
             <div className="border rounded-lg p-4 bg-gray-50">
-              <img 
-                src={qrCodeUrl} 
-                alt="QR Code" 
+              <QRCode
+                value={getQRData()}
+                size={getQRSize()}
+                level="H"
                 className="mx-auto"
               />
               
@@ -140,24 +217,38 @@ const QRCodeGenerator = () => {
             {state.inputType === 'wifi' ? (
               <>
                 <div>
-                  <label className="block text-base font-medium text-gray-900 mb-2">SSID</label>
+                  <label className="block text-base font-medium text-gray-900 mb-2">
+                    SSID
+                  </label>
                   <input
                     type="text"
                     value={state.ssid}
                     onChange={(e) => handleInputChange('ssid', e.target.value)}
                     placeholder="Enter WiFi name"
-                    className="w-full px-3 py-2 border rounded-lg text-gray-900 text-base"
+                    className={`w-full px-3 py-2 border rounded-lg text-gray-900 text-base ${
+                      errors.ssid ? 'border-red-500' : ''
+                    }`}
                   />
+                  {errors.ssid && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center text-red-700">
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      <span className="text-sm">{errors.ssid}</span>
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-base font-medium text-gray-900 mb-2">Password</label>
+                  <label className="block text-base font-medium text-gray-900 mb-2">
+                    Password
+                  </label>
                   <div className="flex">
                     <input
                       type={state.showPassword ? "text" : "password"}
                       value={state.password}
                       onChange={(e) => handleInputChange('password', e.target.value)}
                       placeholder="Enter WiFi password"
-                      className="w-full px-3 py-2 border rounded-l-lg text-gray-900 text-base"
+                      className={`w-full px-3 py-2 border rounded-l-lg text-gray-900 text-base ${
+                        errors.password ? 'border-red-500' : ''
+                      }`}
                     />
                     <button
                       onClick={() => handleInputChange('showPassword', !state.showPassword)}
@@ -166,6 +257,12 @@ const QRCodeGenerator = () => {
                       {state.showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
+                  {errors.password && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center text-red-700">
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      <span className="text-sm">{errors.password}</span>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -175,9 +272,17 @@ const QRCodeGenerator = () => {
                   type="text"
                   value={state.url}
                   onChange={(e) => handleInputChange('url', e.target.value)}
-                  placeholder="Enter URL"
-                  className="w-full px-3 py-2 border rounded-lg text-gray-900 text-base"
+                  placeholder="Enter URL (e.g., https://example.com)"
+                  className={`w-full px-3 py-2 border rounded-lg text-gray-900 text-base ${
+                    errors.url ? 'border-red-500' : ''
+                  }`}
                 />
+                {errors.url && (
+                  <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center text-red-700">
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    <span className="text-sm">{errors.url}</span>
+                  </div>
+                )}
               </div>
             )}
 
