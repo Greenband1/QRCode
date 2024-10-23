@@ -1,6 +1,6 @@
 import localFont from "next/font/local";
 import "./globals.css";
-import Analytics from './components/Analytics';
+import Script from 'next/script';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -28,11 +28,23 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        <Script
+          id="squid-analytics"
+          strategy="afterInteractive"
+        >
+          {`
+            (function(squid){
+              (window.$quid) || (window.$quid = {});
+              document.head.appendChild((function(s){ s.src='https://app.asksquid.ai/tfs/'+squid+'/sdk';s.async=1; return s; })(document.createElement('script')));
+            })('6719103019d43af7a47a0bbb');
+          `}
+        </Script>
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
-        <Analytics />
       </body>
     </html>
   );
