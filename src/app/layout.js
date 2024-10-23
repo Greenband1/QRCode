@@ -16,7 +16,13 @@ const geistMono = localFont({
 export const metadata = {
   title: 'QR Code Generator',
   description: 'Generate QR codes for WiFi and URLs',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover',
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }) {
